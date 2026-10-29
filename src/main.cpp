@@ -65,13 +65,16 @@ void initialize() {
   //The manager switches between the callbacks as necessary
   //The manager also auto-configures sizing, so no need to worry about it anymore
 
+  static debugMenu settings;
+
   AM.addAutons( //Adds the autos under one term. Any order works
     autons("L Simple", exampleBlue, exampleRed, true), //The example for regular autons (true is only used once (sets default selected))
     utilAutons("Skills", skillsAuton, true), //Skills
     utilAutons("Simple Drive", basicDrive), //Simple 4-inch drive for when partner has AWP
     utilAutons("Odom Diag", measure_offsets), //Diagnostic (made by EZ Template)
     utilAutons("Turn PID Cal", calibratePID), //Calibrates the turn PID (needs SD card)
-    utilAutons("Simple Turn", simpleTurn) //A simple turn (90 degrees)
+    utilAutons("Simple Turn", simpleTurn), //A simple turn (90 degrees)
+    utilAutons("Debug Menu", []() {initDebug(settings);}) //The debug menu button
   );
   //For utilities (single callback autons) they go:
     //name, callback, (overload) is_skills;

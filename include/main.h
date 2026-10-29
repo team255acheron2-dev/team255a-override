@@ -48,6 +48,7 @@
 #include "subsystems.hpp"
 #include "driver-motions.hpp"
 #include "Custom Extras/pidturncal.hpp"
+#include "debug-mode.hpp"
 
 
 /**

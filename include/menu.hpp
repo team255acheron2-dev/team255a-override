@@ -32,6 +32,8 @@ static const int WHITE = 0xFFFFFF; //Abbreviates white to its hexadecimal number
 static const int TRANSPARENT = 0xFFFFFF00; //The transparent color (extra 00 at start to set a to 0)
 //This makes it easier to read later
 
+extern std::atomic<bool> debugLock;
+
 using namespace std; //std namespace is used
 
 extern void drawImage(); //The drawImage function
@@ -268,9 +270,20 @@ class AutonManager {
 
     void screenTouched(int x, int y) { //Checks everything for touch identification, then redraws screen
 
+        if (debugLock.load()) throw 1; //If the debugLock is true (meaning the debug screen is being accessed), manager ignores touches
+
         if (utilities[3].containsPoint(x, y)) {
             autonomous();
             return;
+        }
+
+        for (auto &u : utilAutos) { //Checks the utility autons initially (check for auto debug menu run)
+            if (u.nameIs() == "Debug Menu"&&u.containsPoint(x, y)) { //If one of the util autons is debug menu and was clicked
+                void (*funcPointer)() = u.callbackIs(); //Store its callback in a new pointer
+                funcPointer(); //Run the function
+                funcPointer = nullptr; //Then free up the pointer (about to leave scope anyway)
+                throw 1; //End screenTouched
+            }
         }
 
         for (auto &u : utilities) { //Checks utilities
