@@ -884,5 +884,9 @@ class AutonManager {
     }
 };
 
+inline AutonManager AM; //Initialize and create the auton manager, AM
+//If I haven't explained this elsewhere, inline is like extern. It allows for declaration across many files
+//What's different is that inline allows for definition as well, due to some property in it having a lot of checks
+
 
 #endif //End directive

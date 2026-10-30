@@ -1,8 +1,5 @@
 #include "main.h"
 
-//Initialize and create the auton manager
-AutonManager AM; //Creates the manager, named AM
-
 /////
 // For installation, upgrading, documentations, and tutorials, check out our website!
 // https://ez-robotics.github.io/EZ-Template/
@@ -66,6 +63,7 @@ void initialize() {
   //The manager also auto-configures sizing, so no need to worry about it anymore
 
   static debugMenu settings;
+  settings.rows = 3;
 
   AM.addAutons( //Adds the autos under one term. Any order works
     autons("L Simple", exampleBlue, exampleRed, true), //The example for regular autons (true is only used once (sets default selected))
