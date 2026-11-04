@@ -68,8 +68,7 @@ class debugMenuItem : public brainSpacing {
 };
 
 struct debugMenu {
-    int rows = 2;
-    std::vector<debugMenuItem> saveItems;
+    int rows = 3;
 };
 
 extern void initDebug(debugMenu); //The function declaration for the initDebug function

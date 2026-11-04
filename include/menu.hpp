@@ -279,9 +279,7 @@ class AutonManager {
 
         for (auto &u : utilAutos) { //Checks the utility autons initially (check for auto debug menu run)
             if (u.nameIs() == "Debug Menu"&&u.containsPoint(x, y)) { //If one of the util autons is debug menu and was clicked
-                void (*funcPointer)() = u.callbackIs(); //Store its callback in a new pointer
-                funcPointer(); //Run the function
-                funcPointer = nullptr; //Then free up the pointer (about to leave scope anyway)
+                pros::Task debug(debugTask);
                 throw 1; //End screenTouched
             }
         }
@@ -420,9 +418,24 @@ class AutonManager {
     bool isSkills = false; //Boolean to store if selected auton is skills
     bool isInit = false; //Boolean to store if the manager has been initialized
     atomic<bool> bgRedrawLock{true};
+    static inline AutonManager *debugPointer = nullptr;
 
     static void touchRecog() {
         if (setupRecog) setupRecog->setupScreenRecognition();
+    }
+
+    void runDebugMenu() {
+        for (auto &u : utilAutos) {
+            if (u.nameIs() == "Debug Menu") {
+                void (*funcPointer)() = u.callbackIs(); //Store its callback in a new pointer
+                funcPointer(); //Run the function
+                funcPointer = nullptr; //Then free up the pointer (about to leave scope anyway)
+            }
+        }
+    }
+
+    static void debugTask() {
+        if (debugPointer) debugPointer->runDebugMenu();
     }
 
     void managerInit(int utilityHeight, int autonRowCount) { //Initializes the manager
@@ -430,6 +443,7 @@ class AutonManager {
 
         instance = this; //Initializes the instance pointer to this
         setupRecog = this;
+        debugPointer = this;
 
         for (int i = 1; i <= 4; ++i) { //Creates the utility sections. Can add more by adjusting numbers
             string name = ""; //Empty string for the name
@@ -839,7 +853,7 @@ class AutonManager {
     }
 
     static void screenStatic() { //The static function to run the background task loop
-        if (instance) instance->backgroundTask();
+        //if (instance) instance->backgroundTask();
     }
 
     static void backgroundTask() { //The background task to print xyt to screen

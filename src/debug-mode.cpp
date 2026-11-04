@@ -8,6 +8,9 @@
 
 void updateDebugItems() {
     debugOptions.clear();
+
+    debugOptions.push_back(debugMenuItem("Save"));
+
     std::string xPos = std::to_string(chassis.odom_x_get());
     std::string yPos = std::to_string(chassis.odom_y_get());
     std::string direction = std::to_string(chassis.odom_theta_get());
@@ -18,19 +21,15 @@ void updateDebugItems() {
 
 /* Current Version details
  *
- * The debug-mode.hpp file is mostly done. There's not a lot besides customization for the debugMenu struct that needs to be done
- * main.cpp and menu.hpp were changed to allow for AM (AutonManager) to be referenced here, mainly to start it back up
- * This file still needs to be worked on a lot more. I will have to decide on where to have the system get all the details
- * to print in the debug. Where do I have that stored/called and the class for debugMenuItem might need to be changed
- * to allow for the data to be updated (depending on where the class objects are made will determine that)
+ * debug.hpp is done
+ * This file needs a bit of work because of the error I describe below:
+ * After drawing the screen and I believe ending the init function, pros errors and says
+ * "Unknown error occurred."
+ * I don't know if that's from the task ending in the menu function or it's from setting the touch
+ * (On review it might have to do with AM running it)
+ * But I'll look into that
  * 
- * For the next time I need to code, here is my current agenda list:
- *  Create where the vector that stores debugMenuItem objects is given info
- *  Update the debugTouch function to check screen touches for toggling
- *  Update the row calculation to add the last item of menuItems to a new row
- *  And the boxes still have to be drawn. That code needs to be added all around
- *  Remember to add in the system to restart up the menu processes (might need to add new function to AM to do that)
- *  Note: menuItems[last] is the button to save all selected data
+ * The screen fully prints though so that's good.
 */
 
 struct overflowLimit { //A struct to group overflow booleans together (for the overflow system to work right)
@@ -41,7 +40,7 @@ struct overflowLimit { //A struct to group overflow booleans together (for the o
 int setPosition(int pixel, int totalObjects, int verticalPixel, int availableYPixels, int vertRows, debugMenuItem& data) { //Sets the input member's position
     pixel += 4; //Adds 4 for starting offset
     int leftBound = pixel; //What the left bound is
-    int horizontalDistance = ((480 - (totalObjects * 8)) / totalObjects) / 2; //*8 is for spacing, then divide for the slide
+    int horizontalDistance = ((480 - (totalObjects * 8)) / totalObjects); //*8 is for spacing, then divide for the slide
     pixel += horizontalDistance; //Moves to the right edge
     int rightBound = pixel; //Right bound is now the current pixel
     pixel += 4; //Moves it right 4 again
@@ -65,7 +64,8 @@ void redrawDebug() {
     pros::screen::set_pen(0x0004FA); //A dark cyan/Mid-range blue
     pros::screen::fill_rect(0, 0, 480, 240); //Draws a rectangle over the whole screen
     std::string titleText = "Debug Mode";
-    pros::screen::print(pros::E_TEXT_MEDIUM, 0, std::int16_t(0), "Debug Mode");
+    pros::screen::set_pen(0xFFFFFF);
+    pros::screen::print(pros::E_TEXT_LARGE, 0, std::int16_t(0), "Debug Mode");
 
     for (int i = 0; i < debugOptions.size(); i++) {
         debugOptions[i].setTextColor(0xFFFFFF);
@@ -87,6 +87,7 @@ void touchChecks(int x, int y) {
 }
 
 void debugTouch(int x, int y) {
+    printf("Entered touch function\n");
     if (!touchLock.exchange(true)) { //If a touch hasn't already happened (exchange swaps values, and I do ! to check for false)
 
         if (debugOptions.back().containsPoint(x, y)) { //If the confirmation button was pressed (checks separately)
@@ -118,6 +119,12 @@ void release() {
     touchLock.store(false);
 }
 
+void touchCallback() {
+    printf("Touch callback started\n");
+    pros::screen_touch_status_s_t status = pros::screen::touch_status();
+    debugTouch(status.x, status.y);
+}
+
 //The function to clear up the screen and start the debug screen.
 void initDebug(debugMenu menuSettings) {
     debugLock.store(true);
@@ -127,28 +134,29 @@ void initDebug(debugMenu menuSettings) {
     auto calculateRows = [&vrows] (size_t inputSize, vector<int>& output) { //Lambda to calculate rows and store them in inputted vector
 
         int totalCounter = 0; //Counter for how many total autons have been placed into rows
+        
+        inputSize--; //Remove one from the input to pretend the save doesn't exist. I'll add it back in later
 
         int vrowsRestore = vrows; //The temporary variable to store vrows (so it can adapt and work across multiple calls)
         if (vrows > inputSize) { //When too many rows compared to autons needed to place
             vrows = inputSize; //Make how many rows are needed = to how many autons there are
         }
 
-        int overflow = inputSize % (vrows - 1); //Variable to store over flow (when uneven compared to row count, returns remainder)
+        int overflow = inputSize % (vrows); //Variable to store over flow (when uneven compared to row count, returns remainder)
         atomic<bool> overflowDelay{true}; //An atomic to reduce lines used (vs bool) and to act as a lock
-        int basicNum = inputSize / (vrows - 1); //The basic unmodified number for each row (overflow adds to this to get every auton)
+        int basicNum = inputSize / (vrows); //The basic unmodified number for each row (overflow adds to this to get every auton)
 
         overflowLimit overflowCheck; //Variable that prevents overflow skip in systems with > 3 rows and that are
         //almost able to add a new auton to every row (makes second to last get the extra overflow, not top row)
 
-        int magicNumber = (vrows - 1); //The magic number (The smallest multiple of rows that is bigger than the input size)
+        int magicNumber = (vrows); //The magic number (The smallest multiple of rows that is bigger than the input size)
         while (magicNumber < inputSize) { //While the magic number is smaller than the input size (no = for safety for 1 row)
-            magicNumber += (vrows - 1); //Adds to the magic number until it is bigger, acting as a multiple of rows
+            magicNumber += (vrows); //Adds to the magic number until it is bigger, acting as a multiple of rows
         }
         overflowCheck.check = (inputSize == magicNumber - 1); //Sets the check to if the input is one away from overflow 0
 
         if (vrows <= 3) overflowCheck.flag = true; //If too few for overflow to matter prevent fallthrough (for 3, 2, 1 rows)
-
-        for (int i = 1; i <= vrows - 1; i++) { //For loop to save how many autons go in each row (first row is bottom, last is top)
+        for (int i = 1; i <= vrows; i++) { //For loop to save how many autons go in each row (first row is bottom, last is top)
             if (i == 1) { //If first auton (will be last to get new auton)
                 output.push_back(basicNum); //Add the basic number
             } else if (i != vrows) { //If not the final row yet
@@ -173,8 +181,8 @@ void initDebug(debugMenu menuSettings) {
             totalCounter += output.back(); //After each loop this gets updated with last addition, so that the final is correct
         }
 
-        output.push_back(1); //Once done all, since an extra row was saved (-1 on calculations)
-        //Save the extra row for the last element, which is guaranteed to be the save button
+        output.push_back(1); //Once all done, add in the save button slot we removed earlier
+        //Saves an extra row for the last element, which is guaranteed to be the save button
 
         vrows = vrowsRestore; //Restores the vrow to what it was.
     };
@@ -185,7 +193,7 @@ void initDebug(debugMenu menuSettings) {
 
     calculateRows(debugOptions.size(), rowCounts);
 
-    int minVertical = 20;
+    int minVertical = 30;
 
     //Assume 2 rows per screen
     //3 screens in total (red, blue, util)
@@ -212,7 +220,7 @@ void initDebug(debugMenu menuSettings) {
 
     redrawDebug();
 
-    pros::screen::touch_callback([]() {pros::screen_touch_status_s_t status = pros::screen::touch_status(); //Lambda to combine into one function
-                                       debugTouch(status.x, status.y);}, pros::E_TOUCH_PRESSED); //Gets touch info and runs function
+    pros::screen::touch_callback(touchCallback, pros::E_TOUCH_PRESSED); //Gets touch info and runs function
     pros::screen::touch_callback(release, pros::E_TOUCH_RELEASED);
+    //Error occurs on maybe a callback that I set above
 }
