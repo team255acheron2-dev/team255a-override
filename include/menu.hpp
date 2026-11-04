@@ -400,6 +400,15 @@ class AutonManager {
         return isSkills; //Returns the boolean
     }
 
+    void reInit() { //For use after debug menu is done
+        drawBG();
+        drawUtilBar();
+        drawScreen();
+        setupScreenRecognition(); //Sets up screen recognition
+        pros::Task newTask(touchRecog);
+        pros::Task screenTask(screenStatic);
+    }
+
     private: //Private Section of the manager
     vector<autons> autos; //Vector to store the autons
     vector<ManagerUtil> utilities; //Vector to place utilities (color and debug)

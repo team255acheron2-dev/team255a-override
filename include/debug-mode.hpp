@@ -52,9 +52,19 @@ class debugMenuItem : public brainSpacing {
         return name;
     }
 
+    void setBoxColor(int newColor) {
+        color = newColor;
+    }
+
+    void setTextColor(int newColor) {
+        textColor = newColor;
+    }
+
     private:
     std::vector<std::string> printData; //Saves the data to print into a vector
     bool toggled = false;
+    int color = 0x000000;
+    int textColor = 0xFFFFFF;
 };
 
 struct debugMenu {
@@ -63,6 +73,8 @@ struct debugMenu {
 };
 
 extern void initDebug(debugMenu); //The function declaration for the initDebug function
+inline std::vector<debugMenuItem> debugOptions;
 
+extern void updateDebugItems();
 
 #endif

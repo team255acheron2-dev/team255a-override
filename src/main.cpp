@@ -83,6 +83,8 @@ void initialize() {
   // Initialize chassis
   chassis.initialize();
   
+  updateDebugItems();
+
   //Also, overloads is abbreviated to ovls, so comments can fit on the screen
   //Initializes the manager with (ovls) rows (for autons), and utility bar vertical pixel size
   AM.initialize(); //Adds the autons with 40 util bar height and 2 rows (without overloads)

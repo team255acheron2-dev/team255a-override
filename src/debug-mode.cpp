@@ -6,6 +6,16 @@
 //That when pressed save debug info to the sd card in the file debug mode.
 //It'll fully replace all data on the sd card in that debug file, instead of appending
 
+void updateDebugItems() {
+    debugOptions.clear();
+    std::string xPos = std::to_string(chassis.odom_x_get());
+    std::string yPos = std::to_string(chassis.odom_y_get());
+    std::string direction = std::to_string(chassis.odom_theta_get());
+    debugOptions.push_back(debugMenuItem("Position", ("X: %s", xPos), ("Y: %s", yPos),
+                            ("Direction: %s", direction)));
+    //debugOptions.push_back(debugMenuItem("Port x Motor Temperature", ("Port x: ", x.whateverGetsTemp)));
+}
+
 /* Current Version details
  *
  * The debug-mode.hpp file is mostly done. There's not a lot besides customization for the debugMenu struct that needs to be done
@@ -51,17 +61,41 @@ int setPosition(int pixel, int totalObjects, int verticalPixel, int availableYPi
 
 std::atomic<bool> touchLock{false};
 
-std::vector<debugMenuItem> menuItems;
+void redrawDebug() {
+    pros::screen::set_pen(0x0004FA); //A dark cyan/Mid-range blue
+    pros::screen::fill_rect(0, 0, 480, 240); //Draws a rectangle over the whole screen
+    std::string titleText = "Debug Mode";
+    pros::screen::print(pros::E_TEXT_MEDIUM, 0, std::int16_t(0), "Debug Mode");
+
+    for (int i = 0; i < debugOptions.size(); i++) {
+        debugOptions[i].setTextColor(0xFFFFFF);
+        debugOptions[i].setBoxColor(debugOptions[i].isToggled() ? 0x00FA52 : 0x000000);
+        debugOptions[i].drawBox();
+    }
+}
+
+void touchChecks(int x, int y) {
+    bool change = false;
+    for (int i = 0; i < debugOptions.size() - 1; i++) {
+        if (debugOptions[i].containsPoint(x, y)) {
+            change = true;
+            debugOptions[i].setToggle(!debugOptions[i].isToggled());
+        }
+    }
+
+    if (change) redrawDebug();
+}
 
 void debugTouch(int x, int y) {
     if (!touchLock.exchange(true)) { //If a touch hasn't already happened (exchange swaps values, and I do ! to check for false)
 
-        if (menuItems.back().containsPoint(x, y)) { //If the confirmation button was pressed (checks separately)
+        if (debugOptions.back().containsPoint(x, y)) { //If the confirmation button was pressed (checks separately)
             auto currentTime = std::chrono::system_clock::now(); //Gets the current time from the brain
             std::string outputTextStream = std::format("Debug Log - {:%Y-%m-%d %H:%M:%S} \n", currentTime); //Stores all that in the title for the log
-            for (int i = 0; i < menuItems.size() - 1; i++) { //Runs through everything except the last (save button)
-                if (!menuItems[i].isToggled()) continue; //If the current data isn't toggled, keep going
-                outputTextStream += menuItems[i].getOutputData(); //Goes to each data and has it return what data to add
+            updateDebugItems(); //Update all the items before retrieving
+            for (int i = 0; i < debugOptions.size() - 1; i++) { //Runs through everything except the last (save button)
+                if (!debugOptions[i].isToggled()) continue; //If the current data isn't toggled, keep going
+                outputTextStream += debugOptions[i].getOutputData(); //Goes to each data and has it return what data to add
                 //It includes the name and all contents that it wanted.
             }
 
@@ -75,7 +109,8 @@ void debugTouch(int x, int y) {
             }
 
             debugLock.store(false); //Once everything has saved and completed, open up the lock that was holding up the menu
-        }
+            AM.reInit(); //Starts the menu selection back up
+        } else touchChecks(x, y);
     }
 }
 
@@ -86,11 +121,6 @@ void release() {
 //The function to clear up the screen and start the debug screen.
 void initDebug(debugMenu menuSettings) {
     debugLock.store(true);
-
-    pros::screen::set_pen(0x0004FA); //A dark cyan/Mid-range blue
-    pros::screen::fill_rect(0, 0, 480, 240); //Draws a rectangle over the whole screen
-    std::string titleText = "Debug Mode";
-    pros::screen::print(pros::E_TEXT_MEDIUM, 0, std::int16_t(0), "Debug Mode");
 
     int vrows = menuSettings.rows;
 
@@ -103,22 +133,22 @@ void initDebug(debugMenu menuSettings) {
             vrows = inputSize; //Make how many rows are needed = to how many autons there are
         }
 
-        int overflow = inputSize % vrows; //Variable to store over flow (when uneven compared to row count, returns remainder)
+        int overflow = inputSize % (vrows - 1); //Variable to store over flow (when uneven compared to row count, returns remainder)
         atomic<bool> overflowDelay{true}; //An atomic to reduce lines used (vs bool) and to act as a lock
-        int basicNum = inputSize / vrows; //The basic unmodified number for each row (overflow adds to this to get every auton)
+        int basicNum = inputSize / (vrows - 1); //The basic unmodified number for each row (overflow adds to this to get every auton)
 
         overflowLimit overflowCheck; //Variable that prevents overflow skip in systems with > 3 rows and that are
         //almost able to add a new auton to every row (makes second to last get the extra overflow, not top row)
 
-        int magicNumber = vrows; //The magic number (The smallest multiple of rows that is bigger than the input size)
+        int magicNumber = (vrows - 1); //The magic number (The smallest multiple of rows that is bigger than the input size)
         while (magicNumber < inputSize) { //While the magic number is smaller than the input size (no = for safety for 1 row)
-            magicNumber += vrows; //Adds to the magic number until it is bigger, acting as a multiple of rows
+            magicNumber += (vrows - 1); //Adds to the magic number until it is bigger, acting as a multiple of rows
         }
         overflowCheck.check = (inputSize == magicNumber - 1); //Sets the check to if the input is one away from overflow 0
 
         if (vrows <= 3) overflowCheck.flag = true; //If too few for overflow to matter prevent fallthrough (for 3, 2, 1 rows)
 
-        for (int i = 1; i <= vrows; i++) { //For loop to save how many autons go in each row (first row is bottom, last is top)
+        for (int i = 1; i <= vrows - 1; i++) { //For loop to save how many autons go in each row (first row is bottom, last is top)
             if (i == 1) { //If first auton (will be last to get new auton)
                 output.push_back(basicNum); //Add the basic number
             } else if (i != vrows) { //If not the final row yet
@@ -143,6 +173,9 @@ void initDebug(debugMenu menuSettings) {
             totalCounter += output.back(); //After each loop this gets updated with last addition, so that the final is correct
         }
 
+        output.push_back(1); //Once done all, since an extra row was saved (-1 on calculations)
+        //Save the extra row for the last element, which is guaranteed to be the save button
+
         vrows = vrowsRestore; //Restores the vrow to what it was.
     };
 
@@ -150,7 +183,7 @@ void initDebug(debugMenu menuSettings) {
 
     std::vector<int> rowCounts;
 
-    calculateRows(menuSettings.saveItems.size(), rowCounts);
+    calculateRows(debugOptions.size(), rowCounts);
 
     int minVertical = 20;
 
@@ -161,21 +194,23 @@ void initDebug(debugMenu menuSettings) {
 
     //Before we can start setting the positions, we need to plan out distances
     //To do that, check how many autons there are (= amount on both screens)
-    int bottomRowCount = menuSettings.saveItems.size() / 2; //Integer division, truncates
-    int topRowCount = menuSettings.saveItems.size() - bottomRowCount; //Will always be the rest
+    int bottomRowCount = debugOptions.size() / 2; //Integer division, truncates
+    int topRowCount = debugOptions.size() - bottomRowCount; //Will always be the rest
     int ySize = 240 - minVertical; //Starting position of y tracker
 
     int autoni = 0; //Separate index for the autons themselves
 
     for (int i = rowCounts.size() - 1; i >= 0; i--) { //For loop for every row (first row is last in storage)
         for (int j = 1; j <= rowCounts[i]; j++) { //In every row, for amount of autons there should be, set their position
-            horizontalPixel = setPosition(horizontalPixel, rowCounts[i], verticalPixel, ySize, vrows, menuItems[i]);
+            horizontalPixel = setPosition(horizontalPixel, rowCounts[i], verticalPixel, ySize, vrows, debugOptions[i]);
             ++autoni; //Iterates autonomous index
         }
 
         horizontalPixel = 0; //Resets the horizontal pixel after each row
         verticalPixel += (240 - minVertical) / vrows; //Moves y pixel after each row
     }
+
+    redrawDebug();
 
     pros::screen::touch_callback([]() {pros::screen_touch_status_s_t status = pros::screen::touch_status(); //Lambda to combine into one function
                                        debugTouch(status.x, status.y);}, pros::E_TOUCH_PRESSED); //Gets touch info and runs function
