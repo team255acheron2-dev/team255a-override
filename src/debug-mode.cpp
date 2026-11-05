@@ -14,8 +14,8 @@ void updateDebugItems() {
     std::string xPos = std::to_string(chassis.odom_x_get());
     std::string yPos = std::to_string(chassis.odom_y_get());
     std::string direction = std::to_string(chassis.odom_theta_get());
-    debugOptions.push_back(debugMenuItem("Position", ("X: %s", xPos), ("Y: %s", yPos),
-                            ("Direction: %s", direction)));
+    debugOptions.push_back(debugMenuItem("Position", "X: " + xPos, "Y: " + yPos,
+                            "Direction: " + direction));
     //debugOptions.push_back(debugMenuItem("Port x Motor Temperature", ("Port x: ", x.whateverGetsTemp)));
 }
 
@@ -58,56 +58,116 @@ int setPosition(int pixel, int totalObjects, int verticalPixel, int availableYPi
     return pixel; //Returns pixel so it can stack
 }
 
+void saveDebugItems(std::vector<std::string> selectedItems) {
+    try {
+        std::ofstream saveFile("DebugOptionsSave.txt");
+        if (!saveFile.is_open()) throw 1;
+        for (int i = 0; i < selectedItems.size(); i++) {
+            saveFile<<(selectedItems[i] + "\n");
+        }
+        saveFile.close();
+    } catch (int e) {
+        printf("SD card not inserted\n");
+    }
+}
+
+void loadSavedItems() {
+    std::vector<std::string> toggledItems;
+    try {
+        std::ifstream saveFile("DebugOptionsSave.txt");
+        if (!saveFile.is_open()) throw 1;
+        std::string tempName;
+        while (getline(saveFile, tempName)) {
+            cout<<tempName;
+            toggledItems.push_back(tempName);
+            tempName = "";
+        }
+        saveFile.close();
+    } catch (int e) {
+        printf("SD card not inserted\n");
+    }
+
+    if (toggledItems.empty()) return;
+    for (int i = 0; i < toggledItems.size(); i++) {
+        for (auto &d : debugOptions) {
+            if (d.nameIs() == toggledItems[i]) {
+                d.setToggle(true);
+            }
+        }
+    }
+}
+
 std::atomic<bool> touchLock{false};
+bool screenRedraw = true; //The boolean to redraw background stuff for the first draw of the debug screen
 
 void redrawDebug() {
-    pros::screen::set_pen(0x0004FA); //A dark cyan/Mid-range blue
-    pros::screen::fill_rect(0, 0, 480, 240); //Draws a rectangle over the whole screen
-    std::string titleText = "Debug Mode";
-    pros::screen::set_pen(0xFFFFFF);
-    pros::screen::print(pros::E_TEXT_LARGE, 0, std::int16_t(0), "Debug Mode");
+    if (screenRedraw) {
+        pros::screen::set_pen(0x0004FA); //A dark cyan/Mid-range blue
+        pros::screen::fill_rect(0, 0, 480, 240); //Draws a rectangle over the whole screen
+        std::string titleText = "Debug Mode";
+        pros::screen::set_pen(0xFFFFFF);
+        pros::screen::print(pros::E_TEXT_LARGE, 0, std::int16_t(0), "Debug Mode");
+        screenRedraw = false;
+        loadSavedItems();
+    }
 
-    for (int i = 0; i < debugOptions.size(); i++) {
-        debugOptions[i].setTextColor(0xFFFFFF);
-        debugOptions[i].setBoxColor(debugOptions[i].isToggled() ? 0x00FA52 : 0x000000);
-        debugOptions[i].drawBox();
+    for (auto &d : debugOptions) {
+        d.setTextColor(0xFFFFFF);
+        d.setBoxColor(d.isToggled() ? 0x00FA45 : 0xFFFFFF);
+        d.drawBoxUpdated();
     }
 }
 
 void touchChecks(int x, int y) {
     bool change = false;
-    for (int i = 0; i < debugOptions.size() - 1; i++) {
-        if (debugOptions[i].containsPoint(x, y)) {
+    for (auto &d : debugOptions) {
+        if (d.containsPoint(x, y)) {
             change = true;
-            debugOptions[i].setToggle(!debugOptions[i].isToggled());
+            d.setToggle(!d.isToggled());
         }
     }
 
     if (change) redrawDebug();
 }
 
+std::atomic<bool> debugTurn{false};
+
 void debugTouch(int x, int y) {
-    printf("Entered touch function\n");
     if (!touchLock.exchange(true)) { //If a touch hasn't already happened (exchange swaps values, and I do ! to check for false)
 
-        if (debugOptions.back().containsPoint(x, y)) { //If the confirmation button was pressed (checks separately)
-            auto currentTime = std::chrono::system_clock::now(); //Gets the current time from the brain
-            std::string outputTextStream = std::format("Debug Log - {:%Y-%m-%d %H:%M:%S} \n", currentTime); //Stores all that in the title for the log
-            updateDebugItems(); //Update all the items before retrieving
-            for (int i = 0; i < debugOptions.size() - 1; i++) { //Runs through everything except the last (save button)
-                if (!debugOptions[i].isToggled()) continue; //If the current data isn't toggled, keep going
-                outputTextStream += debugOptions[i].getOutputData(); //Goes to each data and has it return what data to add
-                //It includes the name and all contents that it wanted.
-            }
-
+        if (!debugOptions.empty()&&debugOptions.front().containsPoint(x, y)) { //If the confirmation button was pressed (checks separately)
+            bool saveSuccess = true;
             try {
-                ofstream debugFile("debugLog.txt"); //Creates or opens the file. Not appending because no || [smth] app
+                std::ofstream debugFile("debugLog.txt"); //Creates or opens the file. Not appending because no || [smth] app
                 if (!debugFile.is_open()) throw 1; //If it isn't open (no sd card) throw to leave early.
-                debugFile<<outputTextStream<<endl; //Saves the completed string file to that file
+                auto currentTime = std::chrono::system_clock::now(); //Gets the current time from the brain
+                std::string outputTextStream = std::format("Debug Log - {:%Y-%m-%d %H:%M:%S} \n", currentTime); //Stores all that in the title for the log
+                updateDebugItems(); //Update all the items before retrieving
+                std::vector<std::string> itemNames;
+                for (size_t i = 0; i + 1 < debugOptions.size(); ++i) { //Runs through everything except the first (save button)
+                    if (!debugOptions[i].isToggled()) continue; //If the current data isn't toggled, keep going
+                    debugFile<<debugOptions[i].getOutputData(); //Goes to each data and has it return what data to add
+                    //It includes the name and all contents that it wanted.
+                    itemNames.push_back(debugOptions[i].nameIs());
+                }
+
+                saveDebugItems(itemNames);
                 debugFile.close();
             } catch(int e) { //If something is thrown, something went wrong
+                saveSuccess = false;
                 printf("Error opening file. The sd card is probably not inserted."); //What probably went wrong. Prints to console
             }
+
+            if (!saveSuccess) {
+                std::vector<std::string> saveItems;
+                for (auto &d : debugOptions) {
+                    if (!d.isToggled()) continue;
+                    saveItems.push_back(d.nameIs());
+                }
+                saveDebugItems(saveItems);
+            }
+
+            debugTurn.store(false);
 
             debugLock.store(false); //Once everything has saved and completed, open up the lock that was holding up the menu
             AM.reInit(); //Starts the menu selection back up
@@ -116,11 +176,12 @@ void debugTouch(int x, int y) {
 }
 
 void release() {
+    if (!debugTurn.load()) return;
     touchLock.store(false);
 }
 
 void touchCallback() {
-    printf("Touch callback started\n");
+    if (!debugTurn.load()) return;
     pros::screen_touch_status_s_t status = pros::screen::touch_status();
     debugTouch(status.x, status.y);
 }
@@ -128,8 +189,12 @@ void touchCallback() {
 //The function to clear up the screen and start the debug screen.
 void initDebug(debugMenu menuSettings) {
     debugLock.store(true);
+    debugTurn.store(true);
+    updateDebugItems();
+    screenRedraw = true;
 
     int vrows = menuSettings.rows;
+    if (vrows < 1) vrows = 1;
 
     auto calculateRows = [&vrows] (size_t inputSize, vector<int>& output) { //Lambda to calculate rows and store them in inputted vector
 

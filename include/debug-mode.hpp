@@ -60,6 +60,22 @@ class debugMenuItem : public brainSpacing {
         textColor = newColor;
     }
 
+    void drawBoxUpdated() const { //Call when drawing box after making background
+        pros::screen::set_pen(color); //Box color
+        pros::screen::fill_rect(pos.left, pos.top, pos.right, pos.bottom); //Draws rectangle
+        pros::screen::set_pen(textColor); //Text color (dependent on current screen)
+
+        pros::text_format_e_t size = pros::E_TEXT_LARGE; //Large by default
+
+        u_int16_t xSize = pos.right - pos.left; //Non-negative number 16 bits big
+        u_int8_t ySize = pos.bottom - pos.top; //Non-negative number 8 bits big (0-255)
+
+        if (ySize < 100||xSize < 200) size = pros::E_TEXT_MEDIUM; //Narrows down to medium, and if too small
+        if (ySize < 50||xSize < 100) size = pros::E_TEXT_SMALL; //Narrow down to small size
+
+        pros::screen::print(size, (pos.left + 4), ((pos.top + pos.bottom)/2), "%s", name); //Print in the specified size.
+    }
+
     private:
     std::vector<std::string> printData; //Saves the data to print into a vector
     bool toggled = false;

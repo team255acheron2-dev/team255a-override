@@ -84,6 +84,7 @@ void initialize() {
   chassis.initialize();
   
   updateDebugItems();
+  AM.setUseScreenTask(false);
 
   //Also, overloads is abbreviated to ovls, so comments can fit on the screen
   //Initializes the manager with (ovls) rows (for autons), and utility bar vertical pixel size

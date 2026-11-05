@@ -268,19 +268,19 @@ class AutonManager {
         screenID = ID; //Sets it
     }
 
-    void screenTouched(int x, int y) { //Checks everything for touch identification, then redraws screen
+    bool screenTouched(int x, int y) { //Checks everything for touch identification, then redraws screen
 
-        if (debugLock.load()) throw 1; //If the debugLock is true (meaning the debug screen is being accessed), manager ignores touches
+        if (debugLock.load()) return true; //If the debug screen is being accessed, manager ignores touches
 
         if (utilities[3].containsPoint(x, y)) {
             autonomous();
-            return;
+            return false;
         }
 
         for (auto &u : utilAutos) { //Checks the utility autons initially (check for auto debug menu run)
             if (u.nameIs() == "Debug Menu"&&u.containsPoint(x, y)) { //If one of the util autons is debug menu and was clicked
                 pros::Task debug(debugTask);
-                throw 1; //End screenTouched
+                return true;
             }
         }
 
@@ -314,6 +314,7 @@ class AutonManager {
 
         save_sd_card(); //Saves what is currently selected to the SD card
         drawScreen(); //Redraw after being done
+        return false;
     }
 
     void store() { //Updates the manager's internal pointer to what is selected
@@ -399,12 +400,20 @@ class AutonManager {
     }
 
     void reInit() { //For use after debug menu is done
-        drawBG();
-        drawUtilBar();
-        drawScreen();
         setupScreenRecognition(); //Sets up screen recognition
         pros::Task newTask(touchRecog);
         pros::Task screenTask(screenStatic);
+        pros::screen::set_pen(0xFFFFFF);
+        pros::screen::print(pros::E_TEXT_LARGE, 30, static_cast<int>(100), "Saving to sd card");
+        pros::delay(300);
+        drawBG();
+        pros::delay(20);
+        drawScreen();
+        drawUtilBar();
+    }
+
+    void setUseScreenTask(bool set) {
+        useScreenExtra = set;
     }
 
     private: //Private Section of the manager
@@ -419,6 +428,7 @@ class AutonManager {
     bool isInit = false; //Boolean to store if the manager has been initialized
     atomic<bool> bgRedrawLock{true};
     static inline AutonManager *debugPointer = nullptr;
+    bool useScreenExtra = true;
 
     static void touchRecog() {
         if (setupRecog) setupRecog->setupScreenRecognition();
@@ -597,7 +607,9 @@ class AutonManager {
     int setPosition(int pixel, int totalObjects, autons& currentAuto, int verticalPixel, utilAutons& utilAuto, bool usingUtil, int availableYPixels, int vertRows) { //Sets the input member's position
         pixel += 4; //Adds 4 for starting offset
         int leftBound = pixel; //What the left bound is
-        int horizontalDistance = ((480 - (totalObjects * 8)) / totalObjects) / 2; //*8 is for spacing, then divide for the slide
+        int extraSpacing = 2;
+        if (!useScreenExtra) extraSpacing = 1;
+        int horizontalDistance = ((480 - (totalObjects * 8)) / totalObjects) / extraSpacing; //*8 is for spacing, then divide for the slide
         pixel += horizontalDistance; //Moves to the right edge
         int rightBound = pixel; //Right bound is now the current pixel
         pixel += 4; //Moves it right 4 again
@@ -808,7 +820,7 @@ class AutonManager {
     void screenTouched() { //Runs when the screen is touched
         if (!touchLock.exchange(true)&&!terminated) { //When first entry on this screen touch and not terminated
             pros::screen_touch_status_s_t status = pros::screen::touch_status(); //Get the touch status
-            screenTouched(status.x, status.y); //Give it to screenTouched
+            if (screenTouched(status.x, status.y)) return; //Stop processing while the debug screen takes over
             master.print(0, 0, "AS: %-20s", selectedAuton()); //Print current auton to controller
             pros::delay(50); //Wait so rumble can que
             master.rumble("."); //Rumble the controller
@@ -853,10 +865,11 @@ class AutonManager {
     }
 
     static void screenStatic() { //The static function to run the background task loop
-        //if (instance) instance->backgroundTask();
+        if (instance) instance->backgroundTask();
     }
 
     static void backgroundTask() { //The background task to print xyt to screen
+        if (!instance->useScreenExtra) return;
         double prevX = chassis.odom_x_get(); //Sets the previous x to current
         double prevY = chassis.odom_y_get(); //Sets the previous y to current
         double prevT = chassis.odom_theta_get(); //Sets previous theta to current
