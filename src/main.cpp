@@ -63,7 +63,7 @@ void initialize() {
   //The manager also auto-configures sizing, so no need to worry about it anymore
 
   static debugMenu settings;
-  settings.itemRows = 2;
+  settings.itemRows = 1;
 
   AM.addAutons( //Adds the autos under one term. Any order works
     autons("L Simple", exampleBlue, exampleRed, true), //The example for regular autons (true is only used once (sets default selected))

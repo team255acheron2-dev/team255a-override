@@ -203,6 +203,7 @@ void initDebug(debugMenu menuSettings) {
     updateDebugItems();
     screenRedraw = true;
 
+    if (menuSettings.itemRows > debugOptions.size() - 1) menuSettings.itemRows = debugOptions.size() - 1;
     int vrows = menuSettings.itemRows + 1;
     if (vrows < 1) vrows = 1;
 
