@@ -32,6 +32,8 @@ static const int WHITE = 0xFFFFFF; //Abbreviates white to its hexadecimal number
 static const int TRANSPARENT = 0xFFFFFF00; //The transparent color (extra 00 at start to set a to 0)
 //This makes it easier to read later
 
+extern std::atomic<bool> debugLock;
+
 using namespace std; //std namespace is used
 
 extern void drawImage(); //The drawImage function
@@ -266,11 +268,21 @@ class AutonManager {
         screenID = ID; //Sets it
     }
 
-    void screenTouched(int x, int y) { //Checks everything for touch identification, then redraws screen
+    bool screenTouched(int x, int y) { //Checks everything for touch identification, then redraws screen
+
+        if (debugLock.load()) return true; //If the debug screen is being accessed, manager ignores touches
 
         if (utilities[3].containsPoint(x, y)) {
             autonomous();
-            return;
+            return false;
+        }
+
+        for (auto &u : utilAutos) { //Checks the utility autons initially (check for auto debug menu run)
+            if (u.nameIs() == "Debug Menu"&&u.containsPoint(x, y)) { //If one of the util autons is debug menu and was clicked
+                if (debugTimeout) return false;
+                pros::Task debug(debugTask);
+                return true;
+            }
         }
 
         for (auto &u : utilities) { //Checks utilities
@@ -303,6 +315,7 @@ class AutonManager {
 
         save_sd_card(); //Saves what is currently selected to the SD card
         drawScreen(); //Redraw after being done
+        return false;
     }
 
     void store() { //Updates the manager's internal pointer to what is selected
@@ -387,6 +400,24 @@ class AutonManager {
         return isSkills; //Returns the boolean
     }
 
+    void reInit() { //For use after debug menu is done
+        debugTimeout = true;
+        setupScreenRecognition(); //Sets up screen recognition
+        pros::Task newTask(touchRecog);
+        pros::Task screenTask(screenStatic);
+        pros::screen::set_pen(0xFFFFFF);
+        pros::screen::print(pros::E_TEXT_LARGE, 30, static_cast<int>(100), "Saving to sd card");
+        pros::delay(300);
+        drawBG();
+        pros::delay(20);
+        drawScreen();
+        drawUtilBar();
+    }
+
+    void setUseScreenTask(bool set) {
+        useScreenExtra = set;
+    }
+
     private: //Private Section of the manager
     vector<autons> autos; //Vector to store the autons
     vector<ManagerUtil> utilities; //Vector to place utilities (color and debug)
@@ -398,9 +429,26 @@ class AutonManager {
     bool isSkills = false; //Boolean to store if selected auton is skills
     bool isInit = false; //Boolean to store if the manager has been initialized
     atomic<bool> bgRedrawLock{true};
+    static inline AutonManager *debugPointer = nullptr;
+    bool useScreenExtra = true;
+    bool debugTimeout = false;
 
     static void touchRecog() {
         if (setupRecog) setupRecog->setupScreenRecognition();
+    }
+
+    void runDebugMenu() {
+        for (auto &u : utilAutos) {
+            if (u.nameIs() == "Debug Menu") {
+                void (*funcPointer)() = u.callbackIs(); //Store its callback in a new pointer
+                funcPointer(); //Run the function
+                funcPointer = nullptr; //Then free up the pointer (about to leave scope anyway)
+            }
+        }
+    }
+
+    static void debugTask() {
+        if (debugPointer) debugPointer->runDebugMenu();
     }
 
     void managerInit(int utilityHeight, int autonRowCount) { //Initializes the manager
@@ -408,6 +456,7 @@ class AutonManager {
 
         instance = this; //Initializes the instance pointer to this
         setupRecog = this;
+        debugPointer = this;
 
         for (int i = 1; i <= 4; ++i) { //Creates the utility sections. Can add more by adjusting numbers
             string name = ""; //Empty string for the name
@@ -561,7 +610,9 @@ class AutonManager {
     int setPosition(int pixel, int totalObjects, autons& currentAuto, int verticalPixel, utilAutons& utilAuto, bool usingUtil, int availableYPixels, int vertRows) { //Sets the input member's position
         pixel += 4; //Adds 4 for starting offset
         int leftBound = pixel; //What the left bound is
-        int horizontalDistance = ((480 - (totalObjects * 8)) / totalObjects) / 2; //*8 is for spacing, then divide for the slide
+        int extraSpacing = 2;
+        if (!useScreenExtra) extraSpacing = 1;
+        int horizontalDistance = ((480 - (totalObjects * 8)) / totalObjects) / extraSpacing; //*8 is for spacing, then divide for the slide
         pixel += horizontalDistance; //Moves to the right edge
         int rightBound = pixel; //Right bound is now the current pixel
         pixel += 4; //Moves it right 4 again
@@ -772,7 +823,7 @@ class AutonManager {
     void screenTouched() { //Runs when the screen is touched
         if (!touchLock.exchange(true)&&!terminated) { //When first entry on this screen touch and not terminated
             pros::screen_touch_status_s_t status = pros::screen::touch_status(); //Get the touch status
-            screenTouched(status.x, status.y); //Give it to screenTouched
+            if (screenTouched(status.x, status.y)) return; //Stop processing while the debug screen takes over
             master.print(0, 0, "AS: %-20s", selectedAuton()); //Print current auton to controller
             pros::delay(50); //Wait so rumble can que
             master.rumble("."); //Rumble the controller
@@ -782,6 +833,7 @@ class AutonManager {
 
     void screenReleased() { //When the screen is released
         touchLock.store(false); //Allow next screen touch to activate
+        debugTimeout = false; //Let the debug button be pressed (if coming back to the screen)
     }
 
     static void touchStatic() { //A function to point to the other functions above
@@ -821,6 +873,7 @@ class AutonManager {
     }
 
     static void backgroundTask() { //The background task to print xyt to screen
+        if (!instance->useScreenExtra) return;
         double prevX = chassis.odom_x_get(); //Sets the previous x to current
         double prevY = chassis.odom_y_get(); //Sets the previous y to current
         double prevT = chassis.odom_theta_get(); //Sets previous theta to current
@@ -870,6 +923,10 @@ class AutonManager {
         }
     }
 };
+
+inline AutonManager AM; //Initialize and create the auton manager, AM
+//If I haven't explained this elsewhere, inline is like extern. It allows for declaration across many files
+//What's different is that inline allows for definition as well, due to some property in it having a lot of checks
 
 
 #endif //End directive

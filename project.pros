@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "255A Springford 2/7/26",
+    "project_name": "255A Start of Season",
     "target": "v5",
     "templates": {
       "EZ-Template": {
@@ -424,8 +424,8 @@
       }
     },
     "upload_options": {
-      "description": "255A's code for the Springford comp on 2/7/26",
-      "icon": "power"
+      "description": "255A's code for the start of the 2026-2027 Season!",
+      "icon": "alien"
     },
     "use_early_access": false
   }

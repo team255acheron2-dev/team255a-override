@@ -1,8 +1,5 @@
 #include "main.h"
 
-//Initialize and create the auton manager
-AutonManager AM; //Creates the manager, named AM
-
 /////
 // For installation, upgrading, documentations, and tutorials, check out our website!
 // https://ez-robotics.github.io/EZ-Template/
@@ -65,13 +62,17 @@ void initialize() {
   //The manager switches between the callbacks as necessary
   //The manager also auto-configures sizing, so no need to worry about it anymore
 
+  static debugMenu settings;
+  settings.itemRows = 1;
+
   AM.addAutons( //Adds the autos under one term. Any order works
     autons("L Simple", exampleBlue, exampleRed, true), //The example for regular autons (true is only used once (sets default selected))
     utilAutons("Skills", skillsAuton, true), //Skills
     utilAutons("Simple Drive", basicDrive), //Simple 4-inch drive for when partner has AWP
     utilAutons("Odom Diag", measure_offsets), //Diagnostic (made by EZ Template)
     utilAutons("Turn PID Cal", calibratePID), //Calibrates the turn PID (needs SD card)
-    utilAutons("Simple Turn", simpleTurn) //A simple turn (90 degrees)
+    utilAutons("Simple Turn", simpleTurn), //A simple turn (90 degrees)
+    utilAutons("Debug Menu", []() {initDebug(settings);}) //The debug menu button
   );
   //For utilities (single callback autons) they go:
     //name, callback, (overload) is_skills;
@@ -82,6 +83,9 @@ void initialize() {
   // Initialize chassis
   chassis.initialize();
   
+  updateDebugItems();
+  AM.setUseScreenTask(false);
+
   //Also, overloads is abbreviated to ovls, so comments can fit on the screen
   //Initializes the manager with (ovls) rows (for autons), and utility bar vertical pixel size
   AM.initialize(); //Adds the autons with 40 util bar height and 2 rows (without overloads)
