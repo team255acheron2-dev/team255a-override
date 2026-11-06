@@ -7,29 +7,44 @@
 //It'll fully replace all data on the sd card in that debug file, instead of appending
 
 void updateDebugItems() {
-    debugOptions.clear();
+    //if (debugOptions.empty()) debugOptions.push_back(debugMenuItem("Filler"));
+    std::vector<debugMenuItem> toggleSave = debugOptions; //Creates a copy of debugOptions to save the toggle state
+    debugOptions.clear(); //Clears the whole vector to reset all data (so a fresh read can go through)
 
-    debugOptions.push_back(debugMenuItem("Save"));
+    auto restoreToggle = [toggleSave](debugMenuItem& item) { //A lambda to restore the toggle on the options
+        for (auto &s : toggleSave) { //Goes through the copy
+            if (s.nameIs() == item.nameIs()) { //If the name matches the given debugOption
+                item.setToggle(s.isToggled()); //Sets the toggle to what was saved before
+            }
+        }
+    };
 
-    std::string xPos = std::to_string(chassis.odom_x_get());
-    std::string yPos = std::to_string(chassis.odom_y_get());
-    std::string direction = std::to_string(chassis.odom_theta_get());
-    debugOptions.push_back(debugMenuItem("Position", "X: " + xPos, "Y: " + yPos,
+    debugOptions.push_back(debugMenuItem("Save")); //Adds the save button first (due to how I set up the screen first goes last)
+
+    std::string xPos = std::to_string(chassis.odom_x_get()); //Gets the x position in a string
+    std::string yPos = std::to_string(chassis.odom_y_get()); //Gets the y
+    std::string direction = std::to_string(chassis.odom_theta_get()); //Gets the direciton
+    debugOptions.push_back(debugMenuItem("Position", "X: " + xPos, "Y: " + yPos, //Saves all that data into the vector
                             "Direction: " + direction));
     //debugOptions.push_back(debugMenuItem("Port x Motor Temperature", ("Port x: ", x.whateverGetsTemp)));
+
+    for (int i = 1; i < debugOptions.size(); i++) { //This restores all previous toggles
+        if (toggleSave.empty()) break; //If nothing was stored before skip this (such as on first run of this function)
+        restoreToggle(debugOptions[i]); //Restore the toggle for every element except the first (save button gets ignored)
+    }
 }
 
 /* Current Version details
  *
- * debug.hpp is done
- * This file needs a bit of work because of the error I describe below:
- * After drawing the screen and I believe ending the init function, pros errors and says
- * "Unknown error occurred."
- * I don't know if that's from the task ending in the menu function or it's from setting the touch
- * (On review it might have to do with AM running it)
- * But I'll look into that
+ * This is a working build with all the features! It works as intended and does a very good job
  * 
- * The screen fully prints though so that's good.
+ * As I use it I'll find things to patch and all that but nothing is really an issue
+ * Do note that there is 1 observed issue.
+ * 
+ * Sometimes when the sd card is reinserted after being removed it fails to load properly
+ * When that happens removing and inserting the sd card seems to fix it
+ * I haven't consistently found what causes it but as time goes on I'll observe
+ * Might just be the sd card though idk
 */
 
 struct overflowLimit { //A struct to group overflow booleans together (for the overflow system to work right)
@@ -136,35 +151,30 @@ void debugTouch(int x, int y) {
     if (!touchLock.exchange(true)) { //If a touch hasn't already happened (exchange swaps values, and I do ! to check for false)
 
         if (!debugOptions.empty()&&debugOptions.front().containsPoint(x, y)) { //If the confirmation button was pressed (checks separately)
-            bool saveSuccess = true;
+            
+            std::vector<std::string> saveItems;
+            for (auto &d : debugOptions) {
+                if (!d.isToggled()) continue;
+                saveItems.push_back(d.nameIs());
+            }
+            saveDebugItems(saveItems);
+
             try {
                 std::ofstream debugFile("debugLog.txt"); //Creates or opens the file. Not appending because no || [smth] app
                 if (!debugFile.is_open()) throw 1; //If it isn't open (no sd card) throw to leave early.
                 auto currentTime = std::chrono::system_clock::now(); //Gets the current time from the brain
                 std::string outputTextStream = std::format("Debug Log - {:%Y-%m-%d %H:%M:%S} \n", currentTime); //Stores all that in the title for the log
                 updateDebugItems(); //Update all the items before retrieving
-                std::vector<std::string> itemNames;
-                for (size_t i = 0; i + 1 < debugOptions.size(); ++i) { //Runs through everything except the first (save button)
+                debugFile<<outputTextStream;
+                for (size_t i = 1; i < debugOptions.size(); ++i) { //Runs through everything except the first (save button)
                     if (!debugOptions[i].isToggled()) continue; //If the current data isn't toggled, keep going
                     debugFile<<debugOptions[i].getOutputData(); //Goes to each data and has it return what data to add
                     //It includes the name and all contents that it wanted.
-                    itemNames.push_back(debugOptions[i].nameIs());
                 }
 
-                saveDebugItems(itemNames);
                 debugFile.close();
             } catch(int e) { //If something is thrown, something went wrong
-                saveSuccess = false;
                 printf("Error opening file. The sd card is probably not inserted."); //What probably went wrong. Prints to console
-            }
-
-            if (!saveSuccess) {
-                std::vector<std::string> saveItems;
-                for (auto &d : debugOptions) {
-                    if (!d.isToggled()) continue;
-                    saveItems.push_back(d.nameIs());
-                }
-                saveDebugItems(saveItems);
             }
 
             debugTurn.store(false);
@@ -193,7 +203,7 @@ void initDebug(debugMenu menuSettings) {
     updateDebugItems();
     screenRedraw = true;
 
-    int vrows = menuSettings.rows;
+    int vrows = menuSettings.itemRows + 1;
     if (vrows < 1) vrows = 1;
 
     auto calculateRows = [&vrows] (size_t inputSize, vector<int>& output) { //Lambda to calculate rows and store them in inputted vector

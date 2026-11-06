@@ -40,7 +40,7 @@ class debugMenuItem : public brainSpacing {
         return finalString;
     }
 
-    bool isToggled() {
+    bool isToggled() const {
         return toggled;
     }
 
@@ -48,7 +48,7 @@ class debugMenuItem : public brainSpacing {
         toggled = newState;
     }
 
-    std::string nameIs() {
+    std::string nameIs() const {
         return name;
     }
 
@@ -84,7 +84,7 @@ class debugMenuItem : public brainSpacing {
 };
 
 struct debugMenu {
-    int rows = 3;
+    int itemRows = 3;
 };
 
 extern void initDebug(debugMenu); //The function declaration for the initDebug function

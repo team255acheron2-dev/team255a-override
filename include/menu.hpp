@@ -279,6 +279,7 @@ class AutonManager {
 
         for (auto &u : utilAutos) { //Checks the utility autons initially (check for auto debug menu run)
             if (u.nameIs() == "Debug Menu"&&u.containsPoint(x, y)) { //If one of the util autons is debug menu and was clicked
+                if (debugTimeout) return false;
                 pros::Task debug(debugTask);
                 return true;
             }
@@ -400,6 +401,7 @@ class AutonManager {
     }
 
     void reInit() { //For use after debug menu is done
+        debugTimeout = true;
         setupScreenRecognition(); //Sets up screen recognition
         pros::Task newTask(touchRecog);
         pros::Task screenTask(screenStatic);
@@ -429,6 +431,7 @@ class AutonManager {
     atomic<bool> bgRedrawLock{true};
     static inline AutonManager *debugPointer = nullptr;
     bool useScreenExtra = true;
+    bool debugTimeout = false;
 
     static void touchRecog() {
         if (setupRecog) setupRecog->setupScreenRecognition();
@@ -830,6 +833,7 @@ class AutonManager {
 
     void screenReleased() { //When the screen is released
         touchLock.store(false); //Allow next screen touch to activate
+        debugTimeout = false; //Let the debug button be pressed (if coming back to the screen)
     }
 
     static void touchStatic() { //A function to point to the other functions above
