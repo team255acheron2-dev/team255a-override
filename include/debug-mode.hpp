@@ -2,6 +2,7 @@
 #include "EZ-Template/api.hpp" //EZ Template stuff
 #include "menu.hpp"
 #include <atomic>
+#include "Custom Extras/pidturncal.hpp"
 
 //This file is meant to house the function/class definition for my debug mode menu
 //I'll explain the concept in the cpp file
@@ -28,6 +29,13 @@ class debugMenuItem : public brainSpacing { //The class for items on the debug m
         };
 
         (storeData(saveDataValues), ...); //Calls the lambda to unfold the fold expression with each term
+    }
+
+    debugMenuItem(std::string title, std::vector<std::string> stringData) {
+        name = title;
+        for (int i = 0; i < stringData.size(); i++) {
+            printData.push_back(stringData[i]);
+        }
     }
 
     std::string getOutputData() { //Returns all the data stored in the item as a string

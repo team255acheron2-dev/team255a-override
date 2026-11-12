@@ -16,16 +16,23 @@ void updateDebugItems() { //Refreshes (and creates) all the debug items
         }
     };
 
-    debugOptions.push_back(debugMenuItem("Save")); //Adds the save button first (due to how I set up the screen first goes last)
-
     std::string xPos = std::to_string(chassis.odom_x_get()); //Gets the x position in a string
     std::string yPos = std::to_string(chassis.odom_y_get()); //Gets the y
     std::string direction = std::to_string(chassis.odom_theta_get()); //Gets the direciton
     debugOptions.push_back(debugMenuItem("Position", "X: " + xPos, "Y: " + yPos, //Saves all that data into the vector
                             "Direction: " + direction));
     //debugOptions.push_back(debugMenuItem("Port x Motor Temperature", ("Port x: ", x.whateverGetsTemp)));
+    std::vector<std::string> loopVector;
+    for (int i = 0; i < loopData.size(); i++) {
+        for (int j = 0; j < loopData[i].size(); j++) {
+            loopVector.push_back(loopData[i][j].exportData());
+        }
+    }
+    debugOptions.push_back(debugMenuItem("Turn Cal Data", loopVector));
 
-    for (int i = 1; i < debugOptions.size(); i++) { //This restores all previous toggles
+    debugOptions.push_back(debugMenuItem("Save")); //Adds the save button last (due to how I set up the screen last goes to bottom)
+
+    for (int i = 0; i < debugOptions.size() - 1; i++) { //This restores all previous toggles
         if (toggleSave.empty()) break; //If nothing was stored before skip this (such as on first run of this function)
         restoreToggle(debugOptions[i]); //Restore the toggle for every element except the first (save button gets ignored)
     }
@@ -147,7 +154,7 @@ std::atomic<bool> debugTurn{false}; //An atomic to control if the debug touch ge
 void debugTouch(int x, int y) { //The function that checks for if the save button was pressed, and handles initial touches
     if (!touchLock.exchange(true)) { //If a touch hasn't already happened (exchange swaps values, and I do ! to check for false)
 
-        if (!debugOptions.empty()&&debugOptions.front().containsPoint(x, y)) { //If the confirmation button was pressed (checks separately)
+        if (!debugOptions.empty()&&debugOptions.back().containsPoint(x, y)) { //If the confirmation button was pressed (checks separately)
             
             std::vector<std::string> saveItems; //Create a vector of all the items saved
             for (auto &d : debugOptions) { //For every debug item
@@ -163,7 +170,7 @@ void debugTouch(int x, int y) { //The function that checks for if the save butto
                 std::string heading = std::format("Debug Log - {:%Y-%m-%d %H:%M:%S} \n", currentTime); //Stores all that in the title for the log
                 updateDebugItems(); //Update all the items before retrieving
                 debugFile<<heading; //Saves the initial debug log info to the file
-                for (size_t i = 1; i < debugOptions.size(); ++i) { //Runs through everything except the first (save button)
+                for (size_t i = 0; i < debugOptions.size() - 1; ++i) { //Runs through everything except the first (save button)
                     if (!debugOptions[i].isToggled()) continue; //If the current data isn't toggled, keep going
                     debugFile<<debugOptions[i].getOutputData(); //Goes to each data and has it return what data to add
                     //It includes the name and all contents that it wanted.
@@ -212,6 +219,7 @@ void initDebug(debugMenu menuSettings) { //Initializes the debug everything, wit
         inputSize--; //Remove one from the input to pretend the save doesn't exist. I'll add it back in later
 
         int vrowsRestore = vrows; //The temporary variable to store vrows (so it can adapt and work across multiple calls)
+        vrows--; //Remove one from the rows expected for calculations in here
         if (vrows > inputSize) { //When too many rows compared to autons needed to place
             vrows = inputSize; //Make how many rows are needed = to how many autons there are
         }
@@ -230,6 +238,11 @@ void initDebug(debugMenu menuSettings) { //Initializes the debug everything, wit
         overflowCheck.check = (inputSize == magicNumber - 1); //Sets the check to if the input is one away from overflow 0
 
         if (vrows <= 3) overflowCheck.flag = true; //If too few for overflow to matter prevent fallthrough (for 3, 2, 1 rows)
+
+        output.push_back(1); //Add in the save button slot we removed earlier (screen works first to last bottom to top)
+        //Saves an extra row for the first element, which is guaranteed to be the save button
+        //The screen assigns items and rows from top-bottom, with the first item being on bottom
+
         for (int i = 1; i <= vrows; i++) { //For loop to save how many autons go in each row (first row is bottom, last is top)
             if (i == 1) { //If first auton (will be last to get new auton)
                 output.push_back(basicNum); //Add the basic number
@@ -255,10 +268,6 @@ void initDebug(debugMenu menuSettings) { //Initializes the debug everything, wit
             totalCounter += output.back(); //After each loop this gets updated with last addition, so that the final is correct
         }
 
-        output.push_back(1); //Once all done, add in the save button slot we removed earlier
-        //Saves an extra row for the first element, which is guaranteed to be the save button
-        //The screen assigns items and rows from top-bottom, with the first item being on bottom
-
         vrows = vrowsRestore; //Restores the vrow to what it was.
     };
 
@@ -277,7 +286,7 @@ void initDebug(debugMenu menuSettings) { //Initializes the debug everything, wit
 
     //Before we can start setting the positions, we need to plan out distances
     //To do that, check how many autons there are (= amount on both screens)
-    int bottomRowCount = debugOptions.size() / 2; //Integer division, truncates
+    int bottomRowCount = (debugOptions.size() - 1) / 2; //Integer division, truncates
     int topRowCount = debugOptions.size() - bottomRowCount; //Will always be the rest
     int ySize = 240 - minVertical; //Starting position of y tracker
 
@@ -285,7 +294,7 @@ void initDebug(debugMenu menuSettings) { //Initializes the debug everything, wit
 
     for (int i = rowCounts.size() - 1; i >= 0; i--) { //For loop for every row (first row is last in storage)
         for (int j = 1; j <= rowCounts[i]; j++) { //In every row, for amount of autons there should be, set their position
-            horizontalPixel = setPosition(horizontalPixel, rowCounts[i], verticalPixel, ySize, vrows, debugOptions[i]);
+            horizontalPixel = setPosition(horizontalPixel, rowCounts[i], verticalPixel, ySize, vrows, debugOptions[autoni]);
             ++autoni; //Iterates autonomous index
         }
 
