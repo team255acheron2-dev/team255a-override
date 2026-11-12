@@ -12,3 +12,4 @@ extern Drive chassis;
 // inline pros::adi::DigitalIn limit_switch('A');
 // inline pros::MotorGroup motor_group({2, 3});
 
+inline pros::Motor claw(11); //The claw motor

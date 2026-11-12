@@ -273,6 +273,9 @@ enum class stdMotorSpeed {
   REV = -127
 };
 
+//ez::PID functionName(kP, kI, kD, startingTotal, "Name");
+//Motor.move(Name, compute_error(target - avgPos, avgPos));
+
 /**
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
@@ -314,6 +317,12 @@ void opcontrol() {
     if (master.get_digital_new_press(DIGITAL_B)) { //On a new click of B
       driveSwitch(); //Switches the drive style
     }
+
+    if (master.get_digital(DIGITAL_R1)) {
+      claw.move(127);
+    } else if (master.get_digital(DIGITAL_R2)) {
+      claw.move(-127);
+    } else claw.brake();
 
     pros::delay(ez::util::DELAY_TIME);  // This is used for timer calculations!  Keep this ez::util::DELAY_TIME
   }
