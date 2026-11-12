@@ -220,5 +220,9 @@ void calibratePID() { //The function that runs all other functions related to ca
         }
 
         saveValues(); //Save the current values to the SD card
+        loopData.push_back({dataVals("Main Counter", counter), dataVals("Constant Counter", indexCounter),
+                            dataVals("Constant Subcounter", indexSubCounter), dataVals("Delta Value", deltaT0),
+                            dataVals("Static (No change) Counter", staticCounter)}); //Save all loop data to the vector
+        //So I can debug any issues using the debug mode
     }
 }
