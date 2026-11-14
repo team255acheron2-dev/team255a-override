@@ -51,8 +51,16 @@ class brainSpacing { //Simple class with the name and pos variables, as well as 
     }
 
     void drawBox() const { //Call when drawing box after making background
-        pros::screen::set_pen(color); //Box color
-        pros::screen::fill_rect(pos.left, pos.top, pos.right, pos.bottom); //Draws rectangle
+        //This new way of drawing the box allows for rounded edges
+        lv_obj_t *box = lv_obj_create(lv_scr_act()); //Creates a screen object named box
+        lv_obj_set_size(box, pos.right - pos.left, pos.bottom - pos.top); //Sets the size based off the stored size
+        lv_obj_set_pos(box, pos.left, pos.top); //Sets the starting position to the stored coordinates
+
+        lv_obj_set_style_radius(box, 20, 0); //Sets how round the corners are (I'll mess with it to find what each number does)
+
+        lv_obj_set_style_bg_color(box, lv_color_hex(color), 0); //Sets the background color to given color
+        lv_obj_set_style_border_width(box, 2, 0); //Sets how thick the border is
+        lv_obj_set_style_border_color(box, lv_color_hex(color), 0); //Sets the color of the border
         pros::screen::set_pen(textColor); //Text color (dependent on current screen)
 
         pros::text_format_e_t size = pros::E_TEXT_LARGE; //Large by default
