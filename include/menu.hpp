@@ -50,26 +50,24 @@ class brainSpacing { //Simple class with the name and pos variables, as well as 
                 (y <= pos.bottom&&y >= pos.top)); //Returns if all are true
     }
 
-    void drawBox() const { //Call when drawing box after making background
-        //This new way of drawing the box allows for rounded edges
-        lv_obj_t *box = lv_obj_create(lv_scr_act()); //Creates a screen object named box
-        lv_obj_set_size(box, pos.right - pos.left, pos.bottom - pos.top); //Sets the size based off the stored size
-        lv_obj_set_pos(box, pos.left, pos.top); //Sets the starting position to the stored coordinates
+    void drawBox() { //Call when drawing box after making background
+        if (box == nullptr) createScreenObj();
+        if (box == nullptr) return;
 
-        lv_obj_set_style_radius(box, 5, 0); //Sets how round the corners are (I'll mess with it to find what each number does)
+        lv_obj_set_style_bg_color(box, lv_color_hex(color), 0); //Refreshes colors
+        lv_obj_set_style_border_color(box, lv_color_hex(color), 0);
+        lv_obj_set_style_text_color(text, lv_color_hex(textColor), 0);
+        lv_obj_clear_flag(box, LV_OBJ_FLAG_HIDDEN); //Shows the box
+    }
 
-        lv_obj_set_style_bg_color(box, lv_color_hex(color), 0); //Sets the background color to given color
-        lv_obj_set_style_border_width(box, 2, 0); //Sets how thick the border is
-        lv_obj_set_style_border_color(box, lv_color_hex(color), 0); //Sets the color of the border
-        lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_style_pad_all(box, 0, 0);
+    void hideBox() {
+        if (box == nullptr) return;
+        lv_obj_add_flag(box, LV_OBJ_FLAG_HIDDEN);
+    }
 
-        lv_obj_t *text = lv_label_create(box); //Creates text as a child of the box
-        lv_label_set_text(text, name.c_str()); //Sets the text to the name
-
-        lv_obj_set_style_text_color(text, lv_color_hex(textColor), 0); //Sets the color to the stored color
-        lv_obj_align(text, LV_ALIGN_LEFT_MID, 4, 0); //Aligns in the center of the box offset by 4 pixels
-        lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0); //Sets the text background to transparent
+    void reOrder() {
+        if (box == nullptr) createScreenObj();
+        lv_obj_move_foreground(box);
     }
 
     void setPosition(int left, int right, int top, int bottom) { //Sets the member's position to the inputted numberds
@@ -87,9 +85,33 @@ class brainSpacing { //Simple class with the name and pos variables, as well as 
         int bottom; //The bottom bound
     }; //The struct need not be global or accessible by children, just the variable made from it
 
+    void createScreenObj() { //Creates the screen object if not already made
+        //This new way of drawing the box allows for rounded edges
+        box = lv_obj_create(lv_scr_act()); //Creates a screen object named box
+        lv_obj_set_size(box, pos.right - pos.left, pos.bottom - pos.top); //Sets the size based off the stored size
+        lv_obj_set_pos(box, pos.left, pos.top); //Sets the starting position to the stored coordinates
+
+        lv_obj_set_style_radius(box, 5, 0); //Sets how round the corners are (I'll mess with it to find what each number does)
+
+        lv_obj_set_style_bg_color(box, lv_color_hex(color), 0); //Sets the background color to given color
+        lv_obj_set_style_border_width(box, 2, 0); //Sets how thick the border is
+        lv_obj_set_style_border_color(box, lv_color_hex(color), 0); //Sets the color of the border
+        lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_pad_all(box, 0, 0);
+
+        text = lv_label_create(box); //Creates text as a child of the box
+        lv_label_set_text(text, name.c_str()); //Sets the text to the name
+
+        lv_obj_set_style_text_color(text, lv_color_hex(textColor), 0); //Sets the color to the stored color
+        lv_obj_align(text, LV_ALIGN_LEFT_MID, 4, 0); //Aligns in the center of the box offset by 4 pixels
+        lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0); //Sets the text background to transparent
+    }
+
     protected: //This section can't be accessed except by the children
     string name; //The name of the member
     brainPosition pos; //The position for it
+    lv_obj_t *box = nullptr;
+    lv_obj_t *text = nullptr;
 };
 
 class autons : public brainSpacing { //The autons class that inherits brainSpacing (parent class) and sets default to public
@@ -284,7 +306,7 @@ class AutonManager {
         }
 
         for (auto &u : utilAutos) { //Checks the utility autons before everything else (check for auto debug menu run)
-            if (u.nameIs() == "Debug Menu"&&u.containsPoint(x, y)) { //If one of the util autons is debug menu and was clicked
+            if (u.nameIs() == "Debug Menu"&&u.containsPoint(x, y)&&getID() == 3) { //If one of the util autons is debug menu and was clicked
                 if (debugTimeout) return false; //If on timeout (to prevent from it re-entering as soon as you exit) leave check
                 pros::Task debug(debugTask); //If good to run start a new task to start running the debug stuff
                 return true; //Return true (so the system later knows to clean up in the meantime)
@@ -416,6 +438,9 @@ class AutonManager {
         pros::delay(300); //Time to let text display and AM's touch sensing to get set up
         drawBG(); //Draws the background
         pros::delay(20); //Buffer to prevent overriding the other 2 parts
+        for (auto &o : autos) {o.reOrder();} //Reorders all the screen objects on top of new bg
+        for (auto &o : utilities) {o.reOrder();}
+        for (auto &o : utilAutos) {o.reOrder();}
         drawScreen(); //Redraws all the boxes
         drawUtilBar(); //Redraws the utility bar
     }
@@ -656,8 +681,6 @@ class AutonManager {
 
             if (bgRedrawLock.compare_exchange_strong(expected, desired)) { //This checks if it is true, and if so, sets it to false
                 if (utilAutos.size() != autos.size()) {
-                    drawBG(); //Then if it was the expected value, draw the background
-                    pros::delay(20); //Delay
                     drawUtilBar(); //Redraw the utility bar (util bar doesn't need redraw besides when background is redrawn)
                     ++redrawBGCounter; //Count up the redraw counter (so when it comes time the utility bar redraws as well)
                 }
@@ -674,6 +697,9 @@ class AutonManager {
             //All screens auto-fill in any available space,
             //So even though the utilities probably will have less
             //With at least 2 it covers up the old screen when drawing, so no need to redraw background
+            for (auto &a : autos) {
+                a.hideBox(); //Hides every other not-used auto
+            }
 
         } else { //If any other screen
 
@@ -682,8 +708,6 @@ class AutonManager {
 
             if (bgRedrawLock.compare_exchange_strong(expected, desired)) { //For the same reason as explained above
                 if (autos.size() != utilAutos.size()) {
-                    drawBG(); //Draws background
-                    pros::delay(20); //Refresh delay
                     drawUtilBar(); //Redraw utility bar
                     ++redrawBGCounter; //Increments the counter
                 }
@@ -698,6 +722,10 @@ class AutonManager {
                 color = a.isSelected() ? YELLOW : BLACK; //Sets background color to yellow if selected, black if not
                 pros::screen::set_eraser(BLACK);
                 a.drawBox(); //Draws the auton
+            }
+
+            for (auto &u : utilAutos) {
+                u.hideBox(); //Hides the unused boxes
             }
         }
     }
