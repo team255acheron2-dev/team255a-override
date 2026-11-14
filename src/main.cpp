@@ -326,8 +326,6 @@ void opcontrol() {
 
     if (master.get_digital(DIGITAL_R1)) {
       toggleMotor.move(127);
-    } else if (master.get_digital(DIGITAL_R2)) {
-      toggleMotor.move(-127);
     } else toggleMotor.brake();
 
     pros::delay(ez::util::DELAY_TIME);  // This is used for timer calculations!  Keep this ez::util::DELAY_TIME
