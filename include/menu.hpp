@@ -56,22 +56,20 @@ class brainSpacing { //Simple class with the name and pos variables, as well as 
         lv_obj_set_size(box, pos.right - pos.left, pos.bottom - pos.top); //Sets the size based off the stored size
         lv_obj_set_pos(box, pos.left, pos.top); //Sets the starting position to the stored coordinates
 
-        lv_obj_set_style_radius(box, 20, 0); //Sets how round the corners are (I'll mess with it to find what each number does)
+        lv_obj_set_style_radius(box, 5, 0); //Sets how round the corners are (I'll mess with it to find what each number does)
 
         lv_obj_set_style_bg_color(box, lv_color_hex(color), 0); //Sets the background color to given color
         lv_obj_set_style_border_width(box, 2, 0); //Sets how thick the border is
         lv_obj_set_style_border_color(box, lv_color_hex(color), 0); //Sets the color of the border
-        pros::screen::set_pen(textColor); //Text color (dependent on current screen)
+        lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_pad_all(box, 0, 0);
 
-        pros::text_format_e_t size = pros::E_TEXT_LARGE; //Large by default
+        lv_obj_t *text = lv_label_create(box); //Creates text as a child of the box
+        lv_label_set_text(text, name.c_str()); //Sets the text to the name
 
-        u_int16_t xSize = pos.right - pos.left; //Non-negative number 16 bits big
-        u_int8_t ySize = pos.bottom - pos.top; //Non-negative number 8 bits big (0-255)
-
-        if (ySize < 100||xSize < 200) size = pros::E_TEXT_MEDIUM; //Narrows down to medium, and if too small
-        if (ySize < 50||xSize < 100) size = pros::E_TEXT_SMALL; //Narrow down to small size
-
-        pros::screen::print(size, (pos.left + 4), ((pos.top + pos.bottom)/2), "%s", name); //Print in the specified size.
+        lv_obj_set_style_text_color(text, lv_color_hex(textColor), 0); //Sets the color to the stored color
+        lv_obj_align(text, LV_ALIGN_LEFT_MID, 4, 0); //Aligns in the center of the box offset by 4 pixels
+        lv_obj_set_style_bg_opa(text, LV_OPA_TRANSP, 0); //Sets the text background to transparent
     }
 
     void setPosition(int left, int right, int top, int bottom) { //Sets the member's position to the inputted numberds
@@ -668,7 +666,7 @@ class AutonManager {
             utilBarRedrawCheck(); //Checks if it needs to redraw
 
             for (auto &u : utilAutos) { //Goes through every utility Auton
-                textColor = WHITE; //Sets the text color to black
+                textColor = BLACK; //Sets the text color to black
                 color = u.isSelected() ? YELLOW : WHITE; //And the background to yellow if selected and white otherwise
                 pros::screen::set_eraser(BLACK);
                 u.drawBox(); //Then it draws the auton
@@ -708,7 +706,7 @@ class AutonManager {
         for (auto &u : utilities) { //This draws the utilities
             if (u.getID() == 1) textColor = BLUE; //If blue, set text to blue
             if (u.getID() == 2) textColor = RED; //If red, set text to red
-            if (u.getID() == 3) textColor = WHITE; //If utility, set text to white
+            if (u.getID() == 3) textColor = BLACK; //If utility, set text to white
             color = WHITE; //Background color is white
             pros::screen::set_eraser(BLACK);
             u.drawBox(); //Draws the utility box
